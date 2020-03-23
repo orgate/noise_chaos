@@ -1,0 +1,409 @@
+ PROGRAM CHAOS !simulation of chaotic attractors
+ IMPLICIT NONE
+  DOUBLE PRECISION, ALLOCATABLE :: Y(:),DY(:),YN(:) 
+  DOUBLE PRECISION, ALLOCATABLE :: X(:),DX(:),XN(:) 
+  DOUBLE PRECISION, ALLOCATABLE :: P12(:,:),P1(:,:), C(:,:,:,:),A(:,:,:),B(:,:),AL(:,:),LEXPMAV(:),DME(:) 
+  DOUBLE PRECISION, ALLOCATABLE :: CS(:,:,:,:),AS(:,:,:),BS(:,:),XS(:) 
+  DOUBLE PRECISION, ALLOCATABLE :: X1(:),X2(:),Y1(:),Y2(:),WR(:),WI(:),Z1(:),Z2(:) 
+  DOUBLE PRECISION, ALLOCATABLE :: YM1(:),YM2(:),ZM1(:),ZM2(:),C1(:),C2(:),H(:), HX(:)
+  INTEGER N,K,L,IW,K1,K2,K3,CC,NP,MCH,MP,MF,MC,K4,K5,MMCH,MMP,MMF,MATKEY,IC,KC,NH,NX
+  INTEGER, ALLOCATABLE :: indx(:)
+  DOUBLE PRECISION T, DT, TFIN, TMEAS, TM, DIF,ran3,CH,LX,LT,LEXP,TEXP,EXPAV, NORM,LH,LHMAX,XMAX
+  DOUBLE PRECISION GS,XG,GW,XP,DEXPAV,NLL,ML,DL,LL,WF,WV,AU,TR,TRR,EMA,EMM,EMAX,EMIN,WX
+  GS(XP,GW)=DEXP(-XP*XP/(GW*GW*2))
+  N=150   !SPACE DIMENSIONALITY
+  TFIN=25.D0/N/N !d-4 for n=200 RELAXATION TIME 
+  TEXP=2000.D0/N/N ! 400 for all stat 5000 for nice pitct! L-exp meas. time
+  DT=1.d-1/N/N ! 2.d-6 for n=200 ! INTEGRATION TIME STEP
+  LT=1.D-3 ! TIME EVOLUTION BEFORE RESCALING FOR LYAPUNOV EXPONENT
+  LX=1.D-3 ! DIFFERENCE IN INITIAL CONDITIONS FOR LYAPUNOV EXPONENT
+  GW=1.D0/DSQRT(1.D0) ! WIDTH OF A GAUSSIAN DISTRIBUTION 
+  NP=1000000 ! MAXIMUM NUMBER OF POINTS IN THE OUTPUT.
+  CH=1.D-1 ! CHAOS CONSTANT, IF IN ONE UNIT TRAJECTORIES DIVERGE MORE --> CHAOS
+  TR=TFIN*0.9/NP ! INTERVAL BETWEEN RECORDING POINTS
+  MC=1! mc/ic -- NUMBER OF REPLICAS OF COEFFICIENTS
+  IC=1! NUMBER OF REPLICAS IN INITIAL CONDITIONS
+  NH=15 ! NUMBER OF POINTS IN LYAPUNOV EXPONENT HISTOGRAM
+  LHMAX=0.3*N*N ! MAXIMUM OF HISTOGRAM FOR LH
+  MATKEY=1 ! MATKEY =1 -- NO MATRIX DIAGONALIZATION, ANY ELSE, WITH
+   NX=150 ! NUMBER OF POINTS IN  X HISTOGRAM
+  XMAX=1.5D0*N ! MAXIMUM OF HISTOGRAM 
+ ALLOCATE(Y(N),DY(N),YN(N),LEXPMAV(N),DME(N))
+  ALLOCATE(X(N),DX(N),XN(N),WR(N),WI(N),H(-NH:NH), HX(-NX:NX))
+  ALLOCATE(C(N,N,N,N),A(N,N,N),B(N,N),AL(N,N),indx(N))
+  ALLOCATE(CS(N,N,N,N),AS(N,N,N),BS(N,N),XS(N))
+  ALLOCATE(P12(N,NP),P1(N,NP),X1(NP),X2(NP),Y1(NP),Y2(NP),Z1(NP),Z2(NP))
+  ALLOCATE(YM1(NP),YM2(NP),ZM1(NP),ZM2(NP),C1(NP),C2(NP))
+  open(unit=12,file='rand.dat.txt')
+  read(12,*)iw
+  close(12)
+  MCH=0 ! NUMBER OF CHAOTIC TRAJECTORIES
+  MP=0  ! NUMBER OF PERIODIC TRAJECTORIES
+  MF=0  ! NUMBER OF FIXED POINT TRAJECTORIES
+ 
+  NLL=0  ! NUMBER OF POSITIVE EIGENVALUES
+  EXPAV=0.D0
+  DEXPAV=0.D0
+  ML=0.D0
+  DL=0.D0
+  EMA=0.D0 ! MAXIMUM EXPONENT
+  EMM=1.D+2 ! MINIMUM EXPONENT
+  EMAX=0.D0 ! MAXIMUM DIRECT EXPONENT this is dummy value...value of emax wil keep changing on getting the max lyapunov expoenent
+  EMIN=1.D+4! MINIMUM DIRECT EXPONENT this is a dummy value, value of emin will keep on changing on getting a lower lyeapunov exp
+      
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+      
+      
+       DO CC=1,MC/IC ! CYCLE ON REPLICAS NOW EACH REPLICA HAS A NUMBER OF IC
+  A=0.d0
+  B=0.d0
+  C=0.d0
+!  iw=-5462456 ! for random number generator
+  !DO K0=1,N
+  
+  DO K1=1,N ! RANDOM MATRIX OF COEFFICIENTS
+ !    XP=RAN3(IW)*2-1.D0 ! UNIFORM ASSIGNMENT OF INITIAL CONDITIONS
+     DO K2=1,N
+    !    WRITE(*,*) K2
+        DO K3=1,N
+          DO K4=1,N
+    44     XP=(RAN3(IW)*2-1.D0)*4*GW ! GAUSSIAN ASSIGNMENT
+       IF(GS(XP,GW).LE.RAN3(IW)) GO TO 44
+         C(K1,K2,K3,K4)=XP
+           !WRITE(*,*) C
+           END DO
+        
+
+!           A(K1,K2,K3)=RAN3(IW)*2-1.D0
+54     XP=(RAN3(IW)*2-1.D0)*4*GW ! GAUSSIAN ASSIGNMENT
+       IF(GS(XP,GW).LE.RAN3(IW)) GO TO 54
+         A(K1,K2,K3)=XP
+        END DO
+!        B(K1,K2)=RAN3(IW)*2-1.D0
+64     XP=(RAN3(IW)*2-1.D0)*4*GW ! GAUSSIAN ASSIGNMENT
+       IF(GS(XP,GW).LE.RAN3(IW)) GO TO 64
+       B(K1,K2)=XP
+    END DO
+  END DO
+  
+  !END DO
+  WRITE(*,*) 'NEW COEFFICIENTS'
+!WRITE(*,*) c
+!  b=0.d0 !!!!!!!!!!!!!!!COMMENT THIS OUT!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
+  DO KC=1,IC
+  DO K1=1,N ! RANDOM INITIAL CONDITIONS
+ !    XP=RAN3(IW)*2-1.D0 ! UNIFORM ASSIGNMENT OF INITIAL CONDITIONS
+74     XP=(RAN3(IW)*2-1.D0)*4*GW ! GAUSSIAN ASSIGNMENT
+       !WRITE(*,*) XP
+       !WRITE(*,*) K1
+       IF(GS(XP,GW).LE.RAN3(IW)) GO TO 74
+       X(K1)=XP*N ! THE SIZE OF ATTRACTOR SCALES WITH N  so an initial condition is put anywhere in N by N grid
+      !WRITE(*,*) X
+       !WRITE(*,*) K1
+       END DO
+  !WRITE(*,*) X
+  K5=0.D0
+  T=0.D0
+  H=0.D0
+  !WRITE(*,*) X
+  DO WHILE (T.LE.TFIN)!.AND.DIF.LE.EPS) !initial relaxation loop where you allow the trajectory to settle..
+     !WRITE(*,*) X
+     CALL DERIVS (X,DX,N,A,B,C)
+        ! WRITE(*,*) X
+
+     CALL RK_CUST(X,DX,N,DT,XN,A,B,C)
+     !OPEN(UNIT=106, FILE='traject_all.dat.txt') ! writing the current trajectory
+     !WRITE(106,*) X
+  !END DO
+  !CLOSE(106)  
+     
+     
+     T=T+DT
+
+     X=XN
+!WRITE(*,*) X
+!WRITE(*,*) 'BARN'  
+  END DO
+! WRITE(*,*) X
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  Y=X + LX/DSQRT(1.D0*N)
+  !WRITE(*,*) X,Y
+  T=0.D0
+  LEXP=0.D0
+  LEXPMAV=0.D0
+  DME=0.D0
+  WF=0.D0
+  WV=0.D0
+  WX=0.D0
+ 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  TMEAS=LT    !LT=1.D-3 ! TIME EVOLUTION BEFORE RESCALING FOR LYAPUNOV EXPONENT
+
+ 
+  DO WHILE (T.LE.TEXP) ! LOOP ON MEASURING L-EXPONENT 
+  
+  
+  DO WHILE (T.LE.TMEAS)! LOOP ON A SINGLE STRETCHING
+     CALL DERIVS (X,DX,N,A,B,C)
+     CALL RK_CUST(X,DX,N,DT,XN,A,B,C)
+     CALL DERIVS (Y,DY,N,A,B,C)
+     CALL RK_CUST(Y,DY,N,DT,YN,A,B,C)
+!OPEN(UNIT=106, FILE='traject_all.dat.txt') ! writing the current trajectory
+  !   WRITE(106,*) X
+ ! END DO
+  !CLOSE(106)  
+    
+     T=T+DT
+     X=XN
+     Y=YN
+     IF(K5.LE.NP-1) THEN ! KEEPINT THE RECORD OF THE FIRST TWO POINTS
+     K5=K5+1
+    
+     DO K=1,N
+     P1(K,K5)=X(K)
+     END DO
+     
+      ! DO K=1,N
+      !  K2=(NX*X(K))/XMAX
+      !  IF (IABS(K2).LE.NX) HX(K2)=HX(K2)+1 !HISTOGRAM OF THE X. 
+     !END DO
+
+     
+        X1(K5)=X(1)   
+        X2(K5)=X(2)  
+        
+        END IF
+        END DO
+
+!OPEN(UNIT=106, FILE='traject_all.dat.txt') ! writing the current trajectory
+ !    WRITE(106,*) P1
+ ! END DO
+  !CLOSE(106)  
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+77   DIF=0.D0
+     DO K=1,N
+        DIF=DIF+(Y(K)-X(K))**2
+        WX=WX+X(K)**2
+     END DO
+     !WRITE(*,*) DIF
+     DIF=DSQRT(DIF)/LX
+     AU=DLOG(DIF)
+     LH=AU/LT
+     WV=WV+AU*AU
+     LEXP=LEXP + AU
+     K=NH*LH/LHMAX ! HISTOGRAM OF EXPONENT
+     IF(dabs(1.d0*K).LE.NH) H(K)=H(K)+1
+     !IF(dabs(1.d0*KR).LE.NHR) H(KR)=H(KR)+1
+     
+       DO K=1,N
+        K2=(NX*X(K))/XMAX
+        IF (IABS(K2).LE.NX) HX(K2)=HX(K2)+1 !HISTOGRAM OF THE X. 
+     END DO
+
+     DO K=1,N
+        Y(K)=X(K)+(Y(K)-X(K))/DIF
+     END DO
+     TMEAS=TMEAS+LT
+  
+  
+  END DO ! end of the loop on sampling points
+  
+  
+  LEXP=LEXP/T          ! AVERAGE EXPONENT FOR THE DIRECT METHOD
+  WV=WV/T/LT           ! DISPERSION FOR DIRECT METHOD
+  WV=DSQRT(DABS(WV-LEXP*LEXP))
+  WX=DSQRT(WX/N/T*LT)
+
+  
+     IF(LEXP.GE.CH) THEN ! FOR TRADITIONAL EXPONENTS
+        MCH=MCH+1
+        EXPAV=EXPAV+LEXP
+        DEXPAV=DEXPAV+LEXP*LEXP
+        IF(LEXP.GE.EMAX) THEN 
+           EMAX=LEXP
+        y1=x1
+        y2=x2
+        P12=P1
+        AS=A ! WRITING THE COEFFICIENTS AND INITIAL CONDITIONS
+        BS=B ! FOR THE LARGEST CHAOS
+        CS=C
+        XS=X
+       END IF
+
+     ELSE IF(LEXP.LT.CH.AND.LEXP.GT.-CH) THEN
+        MP=MP+1
+           c1=x1
+           c2=x2
+     ELSE IF(LEXP.LE.-CH) THEN
+      IF(LEXP.LE.EMIN) THEN
+           EMIN=LEXP
+           Z1=X1
+           Z2=X2
+        END IF
+        MF=MF+1
+     END IF
+ OPEN(UNIT=90, FILE='hist3.dat.txt') ! writing the current trajectory
+  DO K1=-NH,NH
+     WRITE(90,*)K1*LHMAX/NH,H(K1)
+  END DO
+  CLOSE(90)
+
+  OPEN(UNIT=110, FILE='histx3.dat.txt') ! writing the current trajectory
+  DO K1=-NX,NX
+     WRITE(110,*)K1*XMAX/NX,HX(K1)
+  END DO
+  CLOSE(110)
+
+  
+  
+  
+  OPEN(UNIT=90, FILE='xy3.dat.txt') ! writing the current trajectory
+  DO K1=1,K5
+     WRITE(90,*)x1(K1),x2(K1)
+  END DO
+  CLOSE(90)
+  OPEN(UNIT=10, FILE='xymax_st3.dat.txt')
+  DO K1=1,K5
+     !WRITE(10,*)Y1(K1),Y2(K1)
+      WRITE(10,*)P12(:,K1)
+  END DO
+   CLOSE(10)
+  ! OPEN(UNIT=108, FILE='xymax_st3_total.dat.txt')
+  !DO K1=1,K5
+  !   WRITE(108,*) P1
+  !END DO
+  !CLOSE(108)
+  
+  !CLOSE(10)
+  open(unit=10,file='coeff3.dat.txt') ! writing largest chaos  coefficients
+  do k1=1,n
+     do k2=1,n
+        do k3=1,n
+           do k4=1,n
+           write(10,*) cs(k1,k2,k3,k4)
+           end do
+           write (10,*) as(k1,k2,k3)
+        end do
+        write (10,*) bs(k1,k2)
+     end do
+     write (10,*) xs(k1)
+  end do 
+  close(10)
+
+ OPEN(UNIT=15, FILE='xymin_st3.dat.txt')
+  DO K1=1,K5
+     WRITE(15,*)Z1(K1),Z2(K1)
+  END DO
+  CLOSE(15)
+ OPEN(UNIT=13, FILE='xycycle_st3.dat.txt')
+  DO K1=1,K5
+     WRITE(13,*)C1(K1),C2(K1)
+  END DO
+  CLOSE(13)
+
+  OPEN(UNIT=25,FILE='statexp_M3.dat.txt',position='append')
+  write(25,*) N,LEXP,WV,WX,MCH,MP,MF,CC
+!!$  write(25,*) LL,WF,MMCH,MMP,MMF,CC
+!!$  WRITE(25,22) (LEXPMAV(K),DME(K),K=1,MIN0(N,8))
+  CLOSE(25)
+
+     WRITE(*,*)LEXP,WV,WX,MCH,MP,MF,CC ! DATA FROM A PARTICULAR REALIZATION
+!!$     WRITE(*,*) LL,WF,MMCH,MMP,MMF,CC
+!!$     WRITE(*,*)(LEXPMAV(K),K=1,4)
+     write(*,*)'lexpmax, lexpmin', emax, emin
+  !WRITE(*,*)
+
+22 FORMAT(20E12.4)
+END DO ! END OF INITICAL CONDITION LOOP
+  END DO ! END OF CONFIGURATION LOOP
+
+
+  EXPAV=EXPAV/MCH  !FINAL OUTPUT
+  DEXPAV=DEXPAV/MCH
+  DEXPAV=DSQRT(DEXPAV-EXPAV*EXPAV)
+
+  ML=ML/MMCH
+  DL=DL/MMCH
+  DL=DSQRT(DL-ML*ML)
+  NLL=NLL/MCH ! AS IT IS COUNTED ONLY FOR THE DIRECTLY DETERMINED CHAOS
+
+  OPEN(UNIT=30, FILE='statd3.dat.txt',position='append')
+!!$  OPEN(UNIT=31, FILE='statm.dat',position='append')
+  WRITE (30,*)N,EXPAV,DEXPAV,MCH,MP,MF
+!!$  WRITE (31,*)N,ML,DL,NLL,MMCH,MMP,MMF
+  CLOSE(30)
+
+  open(unit=12, file='rand.dat.txt')
+  write(12,*)nint(-ran3(iw)*1.d+6)
+  close(12)
+END PROGRAM CHAOS
+ 
+!==========================================================================
+!  ran3 from Numerical Recipes, 2nd edition
+!--------------------------------------------------------------------------
+      function ran3(idum)
+!==========================================================================
+
+!         implicit real*4(m)
+
+      integer idum
+      integer mbig,seed,mz
+!      real mbig,seed,mz
+      double precision ran3,fac
+
+!         parameter (mbig=4000000.,mseed=1618033.,mz=0.,fac=2.5e-7)
+!      parameter (mbig=1000000000,mseed=161803398,mz=0,fac=1.e-9)
+      parameter (mbig=1000000000,mseed=161803398,mz=0,fac=1./mbig)
+ 
+      integer i,iff,ii,inext,inextp,k
+      integer mj,mk,ma(55)
+!      real  mj,mk,ma(55)
+
+      save iff,inext,inextp,ma
+
+      data iff /0/
+
+1      if(idum.lt.0.or.iff.eq.0)then
+        iff=1
+        mj=mseed-iabs(idum)
+        mj=mod(mj,mbig)
+        ma(55)=mj
+        mk=1
+        do 11 i=1,54
+          ii=mod(21*i,55)
+          ma(ii)=mk
+          mk=mj-mk
+          if(mk.lt.mz)mk=mk+mbig
+          mj=ma(ii)
+11      continue
+        do 13 k=1,4
+          do 12 i=1,55
+            ma(i)=ma(i)-ma(1+mod(i+30,55))
+            if(ma(i).lt.mz)ma(i)=ma(i)+mbig
+12        continue
+13      continue
+        inext=0
+        inextp=31
+        idum=1
+      endif
+      inext=inext+1
+      if(inext.eq.56)inext=1
+      inextp=inextp+1
+      if(inextp.eq.56)inextp=1
+      mj=ma(inext)-ma(inextp)
+      if(mj.lt.mz)mj=mj+mbig
+      ma(inext)=mj
+      ran3=mj*fac
+      if(ran3.le.0.or.ran3.ge.1) goto 1
+!!      if(ran3.le.0.or.ran3.ge.1) Then
+      !! write(6,*)'RAN3 failed: ', ran3
+      ! stop
+!!      endif
+      return
+      end function ran3
+
+

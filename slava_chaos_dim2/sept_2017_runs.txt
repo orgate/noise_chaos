@@ -1,0 +1,15 @@
+n=30 and noise=1
+n=20 and noise=1
+n=30 and noise=0.001
+n=40 and noise=0.001
+n=40 and noise=1
+n=40 and noise=0.01
+n=40 and noise=0.1
+n=30 and noise=0.01
+n=30 and noise=0.1
+n=50 and noise=0.001
+n=50 and noise=0.01
+
+Jan 2018
+n=50 and noise=0.1
+n=50 and noise=1
